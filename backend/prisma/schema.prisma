@@ -1,0 +1,97 @@
+// Prisma Schema for SplitMint
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownedGroups  Group[]       @relation("GroupOwner")
+  memberships  GroupMember[]
+  linkedParticipants Participant[] @relation("LinkedUser")
+}
+
+model Group {
+  id        String   @id @default(cuid())
+  name      String
+  currency  String   @default("INR")
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner        User          @relation("GroupOwner", fields: [ownerId], references: [id])
+  members      GroupMember[]
+  participants Participant[]
+  expenses     Expense[]
+}
+
+model GroupMember {
+  id       String   @id @default(cuid())
+  userId   String
+  groupId  String
+  role     String   @default("member")
+  joinedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+}
+
+model Participant {
+  id               String   @id @default(cuid())
+  groupId          String
+  name             String
+  color            String   @default("#6366f1")
+  avatarUrl        String?
+  isRegisteredUser Boolean  @default(false)
+  linkedUserId     String?
+  createdAt        DateTime @default(now())
+
+  group        Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  linkedUser   User?          @relation("LinkedUser", fields: [linkedUserId], references: [id])
+  paidExpenses Expense[]      @relation("ExpensePayer")
+  splits       ExpenseSplit[]
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  groupId     String
+  payerId     String
+  amount      Float
+  description String
+  category    String   @default("general")
+  expenseDate DateTime @default(now())
+  splitMode   String   @default("equal")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  group  Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  payer  Participant    @relation("ExpensePayer", fields: [payerId], references: [id])
+  splits ExpenseSplit[]
+}
+
+model ExpenseSplit {
+  id            String   @id @default(cuid())
+  expenseId     String
+  participantId String
+  amount        Float
+  percentage    Float?
+  createdAt     DateTime @default(now())
+
+  expense     Expense     @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([expenseId, participantId])
+}
